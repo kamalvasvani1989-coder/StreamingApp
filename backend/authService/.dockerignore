@@ -1,6 +1,12 @@
 node_modules
 npm-debug.log
-.env
 *.log
+.env
+.env.*
+!.env.example
 coverage
 logs
+tmp-uploads
+Dockerfile
+.dockerignore
+.git

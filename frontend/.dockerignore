@@ -3,3 +3,8 @@ build
 npm-debug.log
 *.log
 coverage
+.env
+.env.*
+Dockerfile
+.dockerignore
+.git

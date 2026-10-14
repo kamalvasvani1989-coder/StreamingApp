@@ -28,8 +28,7 @@ services:
 
   streaming:
     build:
-      context: ./backend
-      dockerfile: streamingService/Dockerfile
+      context: ./backend/streamingService
     depends_on:
       - mongo
     environment:
@@ -48,8 +47,7 @@ services:
 
   admin:
     build:
-      context: ./backend
-      dockerfile: adminService/Dockerfile
+      context: ./backend/adminService
     depends_on:
       - mongo
     environment:
@@ -67,8 +65,7 @@ services:
 
   chat:
     build:
-      context: ./backend
-      dockerfile: chatService/Dockerfile
+      context: ./backend/chatService
     depends_on:
       - mongo
     environment:
@@ -95,7 +92,7 @@ services:
       - admin
       - chat
     ports:
-      - "3000:80"
+      - "3000:8080"
 
 volumes:
   mongo-data:
