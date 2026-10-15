@@ -1,0 +1,53 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: streamingapp-eks
+  region: ap-southeast-2
+  tags:
+    project: streamingapp
+
+# Nodes run in public subnets, so no NAT Gateway (saves ~$1/day)
+vpc:
+  nat:
+    gateway: Disable
+
+addons:
+  - name: vpc-cni
+  - name: coredns
+  - name: kube-proxy
+  - name: eks-pod-identity-agent
+  - name: metrics-server          # required for the HPAs
+
+iam:
+  podIdentityAssociations:
+    # AWS Load Balancer Controller (creates the ALB from our Ingress)
+    - namespace: kube-system
+      serviceAccountName: aws-load-balancer-controller
+      createServiceAccount: true
+      wellKnownPolicies:
+        awsLoadBalancerController: true
+    # App pods (admin, streaming) -> S3 bucket only; the SA itself is created by Helm
+    - namespace: streamingapp
+      serviceAccountName: streamingapp-s3
+      createServiceAccount: false
+      permissionPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+            Resource: "arn:aws:s3:::streamingapp-videos-926375049914/*"
+          - Effect: Allow
+            Action: ["s3:ListBucket"]
+            Resource: "arn:aws:s3:::streamingapp-videos-926375049914"
+
+managedNodeGroups:
+  - name: ng-default
+    instanceType: m7i-flex.large
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 3
+    volumeSize: 20
+    privateNetworking: false
+    iam:
+      withAddonPolicies:
+        cloudWatch: true          # used in the monitoring step
