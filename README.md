@@ -136,3 +136,5 @@ Automated tests are not yet included. Recommended smoke checks:
 ## License
 
 MIT © StreamFlix Team
+
+<!-- CI trigger test -->
