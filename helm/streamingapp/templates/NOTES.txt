@@ -1,0 +1,7 @@
+StreamingApp {{ .Chart.AppVersion }} deployed to namespace {{ .Release.Namespace }} (image tag: {{ .Values.image.tag }}).
+
+Get the ALB address (takes 2-3 minutes to provision):
+  kubectl get ingress {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+Check pods and autoscalers:
+  kubectl get pods,hpa -n {{ .Release.Namespace }}

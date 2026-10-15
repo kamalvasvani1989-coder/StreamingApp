@@ -1,0 +1,90 @@
+{{- $root := . -}}
+{{- range $name, $c := .Values.components }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "streamingapp.labels" $root | nindent 4 }}
+    {{- include "streamingapp.selector" (dict "name" $name "release" $root.Release.Name) | nindent 4 }}
+spec:
+  {{- if not $c.hpa.enabled }}
+  replicas: {{ $c.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "streamingapp.selector" (dict "name" $name "release" $root.Release.Name) | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        {{- include "streamingapp.selector" (dict "name" $name "release" $root.Release.Name) | nindent 8 }}
+      {{- if $c.backend }}
+      annotations:
+        checksum/config: {{ include (print $root.Template.BasePath "/configmap.yaml") $root | sha256sum }}
+      {{- end }}
+    spec:
+      {{- if $c.s3 }}
+      serviceAccountName: {{ $root.Values.s3ServiceAccount.name }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ $c.runAsUser }}
+        fsGroup: {{ $c.runAsUser }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ $name }}
+          image: "{{ $root.Values.image.registry }}/{{ $root.Values.image.namespace }}/{{ $name }}:{{ $root.Values.image.tag }}"
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $c.port }}
+          {{- if $c.backend }}
+          env:
+            - name: PORT
+              value: {{ $c.port | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ $root.Release.Name }}-config
+            - secretRef:
+                name: {{ $root.Values.existingSecret }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: {{ $c.healthPath }}
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: {{ $c.healthPath }}
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml $c.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          {{- if $c.tmpUploads }}
+          volumeMounts:
+            - name: tmp-uploads
+              mountPath: /app/tmp-uploads
+          {{- end }}
+      {{- if $c.tmpUploads }}
+      volumes:
+        - name: tmp-uploads
+          emptyDir:
+            sizeLimit: 2Gi
+      {{- end }}
+{{- end }}

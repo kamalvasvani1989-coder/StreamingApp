@@ -1,0 +1,128 @@
+# ---------------------------------------------------------------------------
+# Images
+# Jenkins overrides image.tag with the git commit SHA on every deploy.
+# ---------------------------------------------------------------------------
+image:
+  registry: 926375049914.dkr.ecr.ap-southeast-2.amazonaws.com
+  namespace: streamingapp
+  tag: latest
+  pullPolicy: Always
+
+# ---------------------------------------------------------------------------
+# Non-secret application config (rendered into a ConfigMap)
+# ---------------------------------------------------------------------------
+config:
+  awsRegion: ap-southeast-2
+  s3Bucket: streamingapp-videos-926375049914
+  # Origins allowed by the backends' CORS check (comma-separated).
+  # Add the ALB DNS name here while testing before DNS is set up.
+  clientUrls: "https://streamapp.kamalvasvani.com"
+  # Public base URL the streaming service uses to build stream/thumbnail links
+  publicUrl: "https://streamapp.kamalvasvani.com"
+  jwtExpiresIn: 24h
+
+# Secret created out-of-band (never committed):
+#   kubectl create secret generic streamingapp-secrets -n streamingapp \
+#     --from-literal=MONGO_URI='...' --from-literal=JWT_SECRET='...'
+existingSecret: streamingapp-secrets
+
+# ServiceAccount for pods that need S3 (admin, streaming).
+# AWS permissions come from an EKS Pod Identity association on this SA - no keys in pods.
+s3ServiceAccount:
+  name: streamingapp-s3
+
+# ---------------------------------------------------------------------------
+# Ingress (AWS Load Balancer Controller -> one internet-facing ALB)
+# Paths are evaluated in the order listed: most specific first.
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: alb
+  host: ""          # empty = respond on any host (ALB DNS name works for testing)
+  annotations:
+    alb.ingress.kubernetes.io/load-balancer-name: streamingapp-alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=300
+  paths:
+    - path: /api/admin
+      component: admin
+    - path: /api/chat
+      component: chat
+    - path: /socket.io
+      component: chat
+    - path: /api/streaming
+      component: streaming
+    - path: /api
+      component: auth
+    - path: /
+      component: frontend
+
+# ---------------------------------------------------------------------------
+# Components
+# ---------------------------------------------------------------------------
+components:
+  auth:
+    port: 3001
+    healthPath: /health
+    runAsUser: 1000
+    backend: true
+    s3: false
+    replicas: 2
+    hpa: { enabled: true, minReplicas: 2, maxReplicas: 4, cpuUtilization: 70 }
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { memory: 256Mi }
+
+  streaming:
+    port: 3002
+    healthPath: /api/health
+    runAsUser: 1000
+    backend: true
+    s3: true
+    replicas: 2
+    hpa: { enabled: true, minReplicas: 2, maxReplicas: 4, cpuUtilization: 70 }
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { memory: 384Mi }
+
+  admin:
+    port: 3003
+    healthPath: /api/health
+    runAsUser: 1000
+    backend: true
+    s3: true
+    replicas: 1
+    tmpUploads: true          # multer writes to /app/tmp-uploads
+    hpa: { enabled: true, minReplicas: 1, maxReplicas: 2, cpuUtilization: 70 }
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { memory: 512Mi }
+
+  chat:
+    port: 3004
+    healthPath: /api/health
+    runAsUser: 1000
+    backend: true
+    s3: false
+    # Socket.IO keeps rooms in memory; multiple replicas would need a Redis adapter.
+    # Kept at 1 replica, with ALB stickiness so a client stays on one pod.
+    replicas: 1
+    sticky: true
+    hpa: { enabled: false }
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { memory: 256Mi }
+
+  frontend:
+    port: 8080
+    healthPath: /healthz
+    runAsUser: 101            # nginx-unprivileged
+    backend: false
+    s3: false
+    replicas: 2
+    hpa: { enabled: true, minReplicas: 2, maxReplicas: 4, cpuUtilization: 70 }
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits: { memory: 128Mi }

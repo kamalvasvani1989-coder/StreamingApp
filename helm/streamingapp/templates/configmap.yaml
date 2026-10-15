@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    {{- include "streamingapp.labels" . | nindent 4 }}
+data:
+  NODE_ENV: "production"
+  AWS_REGION: {{ .Values.config.awsRegion | quote }}
+  AWS_S3_BUCKET: {{ .Values.config.s3Bucket | quote }}
+  CLIENT_URLS: {{ .Values.config.clientUrls | quote }}
+  CLIENT_URL: {{ (split "," .Values.config.clientUrls)._0 | trim | quote }}
+  STREAMING_PUBLIC_URL: {{ .Values.config.publicUrl | quote }}
+  JWT_EXPIRES_IN: {{ .Values.config.jwtExpiresIn | quote }}

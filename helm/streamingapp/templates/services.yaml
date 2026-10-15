@@ -1,0 +1,24 @@
+{{- $root := . -}}
+{{- range $name, $c := .Values.components }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "streamingapp.labels" $root | nindent 4 }}
+  annotations:
+    # ALB target-group health check uses each service's own health endpoint
+    alb.ingress.kubernetes.io/healthcheck-path: {{ $c.healthPath }}
+    {{- if $c.sticky }}
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=86400
+    {{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "streamingapp.selector" (dict "name" $name "release" $root.Release.Name) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $c.port }}
+      targetPort: http
+{{- end }}
