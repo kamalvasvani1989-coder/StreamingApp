@@ -3,7 +3,6 @@
 A MERN video-streaming application (StreamFlix) containerised as five microservices, built by Jenkins into Amazon ECR, deployed to Amazon EKS with Helm, monitored with CloudWatch Container Insights, and wired to SNS for alerting and build notifications.
 
    | | |
-   |---|---|
    | **Live app** | https://streamapp.kamalvasvani.com |
    | **Repository** | https://github.com/kamalvasvani1989-coder/StreamingApp (fork of `UnpredictablePrashant/StreamingApp`) |
    | **Region / account** | `ap-southeast-2` (Sydney) / `926375049914` |
