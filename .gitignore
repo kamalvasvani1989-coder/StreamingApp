@@ -130,3 +130,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Secrets - never commit
+*.pem
+*.ppk
+*accessKeys*.csv
+*.env
